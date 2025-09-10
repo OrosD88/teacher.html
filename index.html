@@ -269,11 +269,12 @@
         
         // Функція для парсингу TXT-файлу
         function parseQuizFile(text) {
-            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+            const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line !== '');
             const questions = [];
             let currentQuestion = null;
 
             lines.forEach(line => {
+                // Якщо рядок закінчується знаком питання, це нове запитання
                 if (line.endsWith('?')) {
                     if (currentQuestion) {
                         questions.push(currentQuestion);
@@ -283,25 +284,28 @@
                         options: [],
                         answer: ''
                     };
+                // Якщо рядок починається з зірочки, це правильна відповідь
                 } else if (line.startsWith('*')) {
                     if (currentQuestion) {
                         const answerText = line.substring(1).trim();
                         currentQuestion.options.push(answerText);
                         currentQuestion.answer = answerText;
                     }
+                // Інакше, це варіант відповіді
                 } else {
                     if (currentQuestion) {
-                        currentQuestion.options.push(line.trim());
+                        currentQuestion.options.push(line);
                     }
                 }
             });
 
+            // Додати останнє запитання, якщо воно є
             if (currentQuestion) {
                 questions.push(currentQuestion);
             }
             
             return {
-                title: "Новий тест", // Можна додати поле для назви тесту в майбутньому
+                title: "Новий тест", // Це значення можна зробити динамічним
                 questions: questions
             };
         }
