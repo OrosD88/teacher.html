@@ -7,18 +7,27 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-      import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-      import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, where, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-      import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+      import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+      import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, where, Timestamp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
       
-      const firebaseConfig = JSON.parse(__firebase_config);
-      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+      // Your web app's Firebase configuration
+      // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+      const firebaseConfig = {
+        apiKey: "AIzaSyDyi2I1ztTQdvE-nC4vQjtyTlkeeWzug20",
+        authDomain: "mytestx-b4f6e.firebaseapp.com",
+        projectId: "mytestx-b4f6e",
+        storageBucket: "mytestx-b4f6e.firebasestorage.app",
+        messagingSenderId: "221843238446",
+        appId: "1:221843238446:web:e160d7e8fe110988c139bf",
+        measurementId: "G-TWCX62JDNS"
+      };
+
+      const appId = firebaseConfig.projectId;
 
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
       const auth = getAuth(app);
-      const analytics = getAnalytics(app);
 
       let userId = null;
       let quizData = null;
@@ -122,13 +131,8 @@
               showScreen(loginScreen);
           }
         } else {
-          // Sign in anonymously if no auth token is provided
           try {
-            if (typeof __initial_auth_token !== 'undefined') {
-              await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-              await signInAnonymously(auth);
-            }
+            await signInAnonymously(auth);
           } catch (error) {
             console.error("Firebase Auth error:", error);
             showStatus('Помилка автентифікації. Будь ласка, спробуйте оновити сторінку.', true);
