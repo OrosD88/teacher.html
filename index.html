@@ -45,6 +45,13 @@
             background-color: #9ca3af;
             cursor: not-allowed;
         }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
@@ -60,7 +67,7 @@
                 </label>
                 <div id="fileName" class="text-center text-gray-500 mt-2">Файл не вибрано</div>
                 <button id="uploadBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-300 btn-disabled" disabled>
-                    Завантажити тест
+                    Завантажити та отримати посилання
                 </button>
             </div>
             
@@ -103,10 +110,8 @@
             try {
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
-                    console.log("Signed in with custom token.");
                 } else {
                     await signInAnonymously(auth);
-                    console.log("Signed in anonymously.");
                 }
             } catch (error) {
                 console.error("Authentication failed:", error);
@@ -125,7 +130,7 @@
                 uploadBtn.disabled = true;
                 uploadBtn.classList.add('btn-disabled');
             }
-            uploadResultDiv.innerHTML = ''; // Clear previous messages
+            uploadResultDiv.innerHTML = '';
         });
 
         // Handle file upload
@@ -144,11 +149,9 @@
                 const fileContent = await readFileAsText(file);
                 const quizData = JSON.parse(fileContent);
 
-                // Add the test data to a new document in the public 'tests' collection
                 const testsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'tests');
                 const docRef = await addDoc(testsCollectionRef, quizData);
 
-                // Construct the public URL for the test
                 const testUrl = `${window.location.origin}/student-test.html?testId=${docRef.id}`;
                 
                 showSuccess(`Тест "${quizData.title}" успішно завантажено!`, testUrl);
@@ -178,8 +181,9 @@
         
         function showSuccess(message, url) {
             uploadResultDiv.innerHTML = `
-                <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-lg">
-                    <p class="font-bold">${message}</p>
+                <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-lg fade-in">
+                    <p class="font-bold">Успіх!</p>
+                    <p class="mt-2">${message}</p>
                     <p class="mt-2">Поділіться цим посиланням зі студентами:</p>
                     <div class="mt-2 flex items-center">
                         <input type="text" id="testLink" value="${url}" readonly class="flex-grow bg-white text-gray-800 p-2 rounded-lg border border-gray-300 mr-2 focus:outline-none focus:ring-2 focus:ring-green-500">
@@ -191,7 +195,7 @@
 
         function showError(message) {
             uploadResultDiv.innerHTML = `
-                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg fade-in">
                     <p class="font-bold">Помилка завантаження!</p>
                     <p class="mt-2">${message}</p>
                 </div>
@@ -202,7 +206,6 @@
             const linkInput = document.getElementById('testLink');
             linkInput.select();
             document.execCommand('copy');
-            // Provide visual feedback
             const copyBtn = document.querySelector('button.bg-green-600');
             copyBtn.textContent = 'Скопійовано!';
             setTimeout(() => {
