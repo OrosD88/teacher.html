@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель викладача MyTestX</title>
+    <title>MyTestX</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -52,11 +52,38 @@
         .fade-in {
             animation: fadeIn 0.5s ease-in-out;
         }
+        .hidden {
+            display: none;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spinner {
+            border-top-color: #4f46e5;
+            animation: spin 1s linear infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
-    <div class="container mx-auto p-4 md:p-8">
-        <div id="teacher-screen" class="card mx-auto">
+    <div class="container">
+        
+        <!-- Teacher Login Screen -->
+        <div id="login-screen" class="card mx-auto max-w-md">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Вхід для викладача</h1>
+            <p class="text-center text-gray-600 mb-4">Будь ласка, введіть пароль, щоб отримати доступ.</p>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700">Пароль</label>
+                <input type="password" id="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+            </div>
+            <div id="login-error" class="text-red-500 text-center font-bold hidden mt-2">Неправильний пароль.</div>
+            <button id="login-btn" class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-300">
+                Увійти
+            </button>
+        </div>
+
+        <!-- Teacher Dashboard -->
+        <div id="teacher-screen" class="card mx-auto hidden">
             <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Панель викладача</h1>
             <p class="text-center text-gray-600 mb-8">Завантажте JSON-файл із тестом, щоб створити посилання для студентів.</p>
 
@@ -67,59 +94,154 @@
                 </label>
                 <div id="fileName" class="text-center text-gray-500 mt-2">Файл не вибрано</div>
                 <button id="uploadBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-300 btn-disabled" disabled>
-                    Завантажити та отримати посилання
+                    Створити посилання
                 </button>
             </div>
             
             <div id="loading" class="text-center text-indigo-600 mt-6 hidden">
-                <p>Завантаження тесту...</p>
+                <p>Обробка файлу...</p>
             </div>
-
             <div id="uploadResult" class="mt-6"></div>
+        </div>
+
+        <!-- Student Screens -->
+        
+        <!-- Initial loading/error screen -->
+        <div id="status-screen" class="card text-center space-y-4 hidden">
+            <div id="loading-spinner" class="w-12 h-12 border-4 border-gray-200 rounded-full spinner mx-auto"></div>
+            <p id="status-message" class="text-gray-600 font-medium">Завантаження тесту...</p>
+        </div>
+
+        <!-- Головний екран -->
+        <div id="main-screen" class="card space-y-6 hidden">
+            <h1 id="quiz-title" class="text-3xl font-bold text-center text-gray-800"></h1>
+            <p class="text-center text-gray-600">Будь ласка, введіть свої дані, щоб розпочати тест.</p>
+            <div>
+                <label for="student-name" class="block text-sm font-medium text-gray-700">ПІБ студента</label>
+                <input type="text" id="student-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+            </div>
+            <div>
+                <label for="student-group" class="block text-sm font-medium text-gray-700">Група</label>
+                <input type="text" id="student-group" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+            </div>
+            <div id="student-error" class="text-red-500 text-center font-bold hidden"></div>
+            <button id="start-btn" class="w-full flex justify-center py-3 px-6 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300">
+                Розпочати тест
+            </button>
+        </div>
+
+        <!-- Екран тестування -->
+        <div id="test-screen" class="card hidden space-y-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-700">Запитання <span id="current-question">1</span> з <span id="total-questions"></span></h2>
+            </div>
+            <h3 id="question-text" class="text-2xl font-semibold text-gray-800"></h3>
+            <div id="options-container" class="space-y-3">
+            </div>
+            <div class="flex justify-between mt-6">
+                <button id="prev-btn" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300">
+                    Попереднє
+                </button>
+                <button id="next-btn" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300">
+                    Наступне
+                </button>
+            </div>
+            <button id="submit-btn" class="w-full mt-4 flex justify-center py-3 px-6 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-300 hidden">
+                Завершити тест
+            </button>
+        </div>
+
+        <!-- Екран результатів -->
+        <div id="results-screen" class="card hidden text-center space-y-6">
+            <h2 class="text-3xl font-bold text-gray-800">Результати тесту</h2>
+            <div class="space-y-2 text-lg">
+                <p id="total-questions-el" class="text-gray-600"></p>
+                <p id="correct-answers-el" class="text-green-600 font-bold"></p>
+                <p id="score-percentage-el" class="text-blue-600 font-bold text-2xl"></p>
+            </div>
+            <button id="restart-btn" class="w-full flex justify-center py-3 px-6 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300">
+                Повторити тест
+            </button>
         </div>
     </div>
 
-    <!-- Firebase -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    <script>
+        // Set the teacher's password here
+        const TEACHER_PASSWORD = "D180893$"; 
 
-        // IMPORTANT: Use the global variables for Firebase configuration.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        // Log all Firebase debug messages to the console
-        setLogLevel('debug');
+        let quizData = null;
+        let currentQuestionIndex = 0;
+        let userAnswers = {};
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // UI elements
+        // Teacher UI elements
+        const loginScreen = document.getElementById('login-screen');
+        const passwordInput = document.getElementById('password');
+        const loginBtn = document.getElementById('login-btn');
+        const loginError = document.getElementById('login-error');
+        const teacherScreen = document.getElementById('teacher-screen');
         const quizFile = document.getElementById('quizFile');
         const fileNameDisplay = document.getElementById('fileName');
         const uploadBtn = document.getElementById('uploadBtn');
         const loadingDiv = document.getElementById('loading');
         const uploadResultDiv = document.getElementById('uploadResult');
 
-        // Authenticate with Firebase
-        async function authenticate() {
-            try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Authentication failed:", error);
-                throw new Error("Не вдалося автентифікувати користувача. Спробуйте оновити сторінку.");
+        // Student UI elements
+        const statusScreen = document.getElementById('status-screen');
+        const statusMessage = document.getElementById('status-message');
+        const mainScreen = document.getElementById('main-screen');
+        const testScreen = document.getElementById('test-screen');
+        const resultsScreen = document.getElementById('results-screen');
+        const quizTitleEl = document.getElementById('quiz-title');
+        const studentNameInput = document.getElementById('student-name');
+        const studentGroupInput = document.getElementById('student-group');
+        const studentError = document.getElementById('student-error');
+        const startBtn = document.getElementById('start-btn');
+        const questionTextEl = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const currentQuestionEl = document.getElementById('current-question');
+        const totalQuestionsEl = document.getElementById('total-questions');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const totalQuestionsEl_res = document.getElementById('total-questions-el');
+        const correctAnswersEl = document.getElementById('correct-answers-el');
+        const scorePercentageEl = document.getElementById('score-percentage-el');
+        const restartBtn = document.getElementById('restart-btn');
+
+        // Initial check on page load
+        function initApp() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('quiz')) {
+                loadQuizFromUrl();
+            } else {
+                showScreen(loginScreen);
             }
         }
 
-        // Handle file selection
+        // --- Helper functions for encoding/decoding Unicode strings ---
+        function utf8ToBase64(str) {
+            return btoa(unescape(encodeURIComponent(str)));
+        }
+
+        function base64ToUtf8(str) {
+            try {
+                return decodeURIComponent(escape(atob(str)));
+            } catch (e) {
+                console.error("Failed to decode Base64 string:", e);
+                return null;
+            }
+        }
+        
+        // --- Teacher Logic ---
+        loginBtn.addEventListener('click', () => {
+            if (passwordInput.value === TEACHER_PASSWORD) {
+                showScreen(teacherScreen);
+                loginError.classList.add('hidden');
+            } else {
+                loginError.classList.remove('hidden');
+            }
+        });
+
         quizFile.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 fileNameDisplay.textContent = e.target.files[0].name;
@@ -133,11 +255,10 @@
             uploadResultDiv.innerHTML = '';
         });
 
-        // Handle file upload
         uploadBtn.addEventListener('click', async () => {
             const file = quizFile.files[0];
             if (!file) {
-                showError("Будь ласка, спочатку виберіть файл для завантаження.");
+                showError("Будь ласка, спочатку виберіть файл для завантаження.", uploadResultDiv);
                 return;
             }
 
@@ -145,31 +266,30 @@
             uploadResultDiv.innerHTML = '';
 
             try {
-                await authenticate();
                 const fileContent = await readFileAsText(file);
-                const quizData = JSON.parse(fileContent);
-
-                const testsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'tests');
-                const docRef = await addDoc(testsCollectionRef, quizData);
-
-                const testUrl = `${window.location.origin}/student-test.html?testId=${docRef.id}`;
+                const encodedData = utf8ToBase64(fileContent); // Use the new encoding function
+                if (!encodedData) {
+                    throw new Error("Не вдалося закодувати дані тесту.");
+                }
                 
-                showSuccess(`Тест "${quizData.title}" успішно завантажено!`, testUrl);
-
+                const baseUrl = window.location.origin + window.location.pathname;
+                const testUrl = `${baseUrl}?quiz=${encodedData}`;
+                
+                showSuccess("Посилання успішно створено!", testUrl);
             } catch (error) {
-                console.error("Error uploading quiz:", error);
-                let errorMessage = "Невідома помилка завантаження.";
+                console.error("Error processing quiz:", error);
+                let errorMessage = "Невідома помилка обробки файлу.";
                 if (error instanceof SyntaxError) {
                     errorMessage = "Неправильний формат JSON у файлі. Перевірте, чи файл не пошкоджений.";
                 } else if (error.message) {
                     errorMessage = error.message;
                 }
-                showError(`Не вдалося завантажити тест. ${errorMessage}`);
+                showError(`Не вдалося створити посилання. ${errorMessage}`, uploadResultDiv);
             } finally {
                 loadingDiv.classList.add('hidden');
             }
         });
-
+        
         function readFileAsText(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -192,16 +312,7 @@
                 </div>
             `;
         }
-
-        function showError(message) {
-            uploadResultDiv.innerHTML = `
-                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg fade-in">
-                    <p class="font-bold">Помилка завантаження!</p>
-                    <p class="mt-2">${message}</p>
-                </div>
-            `;
-        }
-
+        
         window.copyLink = function() {
             const linkInput = document.getElementById('testLink');
             linkInput.select();
@@ -212,6 +323,182 @@
                 copyBtn.textContent = 'Копіювати';
             }, 2000);
         };
+        
+        // --- Student Logic ---
+        function loadQuizFromUrl() {
+            showScreen(statusScreen);
+            const urlParams = new URLSearchParams(window.location.search);
+            try {
+                const encodedQuiz = urlParams.get('quiz');
+                if (!encodedQuiz) {
+                    showStatus('Помилка: Не знайдено дані тесту в URL. Це сторінка для викладача.', true);
+                    return;
+                }
+                const decodedData = base64ToUtf8(encodedQuiz); // Use the new decoding function
+                if (!decodedData) {
+                    showStatus('Не вдалося декодувати тест. Перевірте посилання.', true);
+                    return;
+                }
+                quizData = JSON.parse(decodedData);
+                
+                showStatus('', false); 
+                showScreen(mainScreen);
+                quizTitleEl.textContent = quizData.title;
+            } catch (e) {
+                console.error("Помилка завантаження тесту: ", e);
+                showStatus('Не вдалося завантажити тест. Перевірте посилання або спробуйте ще раз.', true);
+            }
+        }
+        
+        startBtn.addEventListener('click', () => {
+            const studentName = studentNameInput.value.trim();
+            const studentGroup = studentGroupInput.value.trim();
+
+            if (!studentName || !studentGroup) {
+                showError("Будь ласка, заповніть усі поля.", studentError);
+                return;
+            }
+
+            showScreen(testScreen);
+            totalQuestionsEl.textContent = quizData.questions.length;
+            currentQuestionIndex = 0;
+            userAnswers = {};
+            
+            showQuestion();
+            updateNavigationButtons();
+        });
+
+        function showQuestion() {
+            const currentQuestion = quizData.questions[currentQuestionIndex];
+            questionTextEl.textContent = currentQuestion.question;
+            optionsContainer.innerHTML = '';
+            currentQuestion.options.forEach(option => {
+                const optionBtn = document.createElement('button');
+                optionBtn.textContent = option;
+                optionBtn.classList.add('w-full', 'py-3', 'px-4', 'text-left', 'border', 'rounded-md', 'shadow-sm', 'text-sm', 'font-medium', 'text-gray-700', 'bg-gray-50', 'hover:bg-gray-100', 'focus:outline-none', 'focus:ring-2', 'focus:ring-offset-2', 'focus:ring-indigo-500', 'transition-colors', 'duration-300');
+                
+                if (userAnswers[currentQuestionIndex] === option) {
+                    optionBtn.classList.add('bg-indigo-500', 'text-white', 'hover:bg-indigo-600');
+                }
+                
+                optionBtn.addEventListener('click', () => {
+                    userAnswers[currentQuestionIndex] = option;
+                    updateOptionsUI(currentQuestion.options, option);
+                    updateNavigationButtons();
+                });
+                optionsContainer.appendChild(optionBtn);
+            });
+            currentQuestionEl.textContent = currentQuestionIndex + 1;
+        }
+
+        function updateOptionsUI(options, selectedOption) {
+            optionsContainer.innerHTML = '';
+            options.forEach(option => {
+                const optionBtn = document.createElement('button');
+                optionBtn.textContent = option;
+                optionBtn.classList.add('w-full', 'py-3', 'px-4', 'text-left', 'border', 'rounded-md', 'shadow-sm', 'text-sm', 'font-medium', 'text-gray-700', 'bg-gray-50', 'hover:bg-gray-100', 'focus:outline-none', 'focus:ring-2', 'focus:ring-offset-2', 'focus:ring-indigo-500', 'transition-colors', 'duration-300');
+                
+                if (option === selectedOption) {
+                    optionBtn.classList.add('bg-indigo-500', 'text-white', 'hover:bg-indigo-600');
+                    optionBtn.classList.remove('bg-gray-50');
+                }
+                
+                optionBtn.addEventListener('click', () => {
+                    userAnswers[currentQuestionIndex] = option;
+                    updateOptionsUI(options, option);
+                    updateNavigationButtons();
+                });
+                optionsContainer.appendChild(optionBtn);
+            });
+        }
+
+        function updateNavigationButtons() {
+            prevBtn.classList.toggle('hidden', currentQuestionIndex === 0);
+            
+            if (currentQuestionIndex === quizData.questions.length - 1) {
+                nextBtn.classList.add('hidden');
+                submitBtn.classList.remove('hidden');
+            } else {
+                nextBtn.classList.remove('hidden');
+                submitBtn.classList.add('hidden');
+            }
+        }
+
+        prevBtn.addEventListener('click', () => {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                showQuestion();
+                updateNavigationButtons();
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            if (currentQuestionIndex < quizData.questions.length - 1) {
+                currentQuestionIndex++;
+                showQuestion();
+                updateNavigationButtons();
+            }
+        });
+
+        submitBtn.addEventListener('click', () => {
+            showResults(calculateScore());
+        });
+
+        function calculateScore() {
+            let score = 0;
+            quizData.questions.forEach((q, index) => {
+                if (userAnswers[index] === q.answer) {
+                    score++;
+                }
+            });
+            return score;
+        }
+
+        function showResults(score) {
+            testScreen.classList.add('hidden');
+            resultsScreen.classList.remove('hidden');
+            const totalQuestions = quizData.questions.length;
+            const percentage = ((score / totalQuestions) * 100).toFixed(2);
+            totalQuestionsEl_res.textContent = `Загальна кількість запитань: ${totalQuestions}`;
+            correctAnswersEl.textContent = `Правильних відповідей: ${score}`;
+            scorePercentageEl.textContent = `Ваш результат: ${percentage}%`;
+        }
+
+        restartBtn.addEventListener('click', () => {
+            resultsScreen.classList.add('hidden');
+            showScreen(mainScreen);
+            studentNameInput.value = '';
+            studentGroupInput.value = '';
+            currentQuestionIndex = 0;
+            userAnswers = {};
+        });
+        
+        function showScreen(screen) {
+            document.querySelectorAll('.card').forEach(s => s.classList.add('hidden'));
+            screen.classList.remove('hidden');
+        }
+
+        function showStatus(message, isError) {
+            statusMessage.textContent = message;
+            if (isError) {
+                statusMessage.classList.add('text-red-600');
+                document.getElementById('loading-spinner').classList.add('hidden');
+            }
+            statusScreen.classList.remove('hidden');
+            if (isError) {
+                setTimeout(() => statusScreen.classList.add('hidden'), 5000);
+            }
+        }
+
+        function showError(message, element) {
+            element.textContent = message;
+            element.classList.remove('hidden');
+            setTimeout(() => {
+                element.classList.add('hidden');
+            }, 5000);
+        }
+
+        initApp();
     </script>
 </body>
 </html>
