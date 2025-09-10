@@ -41,6 +41,10 @@
         .file-input-label:hover {
             background-color: #4338ca;
         }
+        .btn-disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
@@ -55,7 +59,7 @@
                     <span>Вибрати файл тесту (.json)</span>
                 </label>
                 <div id="fileName" class="text-center text-gray-500 mt-2">Файл не вибрано</div>
-                <button id="uploadBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-300">
+                <button id="uploadBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-300 btn-disabled" disabled>
                     Завантажити тест
                 </button>
             </div>
@@ -106,21 +110,29 @@
                 }
             } catch (error) {
                 console.error("Authentication failed:", error);
+                throw new Error("Не вдалося автентифікувати користувача. Спробуйте оновити сторінку.");
             }
         }
 
+        // Handle file selection
         quizFile.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 fileNameDisplay.textContent = e.target.files[0].name;
+                uploadBtn.disabled = false;
+                uploadBtn.classList.remove('btn-disabled');
             } else {
                 fileNameDisplay.textContent = 'Файл не вибрано';
+                uploadBtn.disabled = true;
+                uploadBtn.classList.add('btn-disabled');
             }
+            uploadResultDiv.innerHTML = ''; // Clear previous messages
         });
 
+        // Handle file upload
         uploadBtn.addEventListener('click', async () => {
             const file = quizFile.files[0];
             if (!file) {
-                showError("Будь ласка, виберіть файл для завантаження.");
+                showError("Будь ласка, спочатку виберіть файл для завантаження.");
                 return;
             }
 
@@ -143,7 +155,13 @@
 
             } catch (error) {
                 console.error("Error uploading quiz:", error);
-                showError("Не вдалося завантажити тест. Переконайтесь, що формат файлу вірний.");
+                let errorMessage = "Невідома помилка завантаження.";
+                if (error instanceof SyntaxError) {
+                    errorMessage = "Неправильний формат JSON у файлі. Перевірте, чи файл не пошкоджений.";
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                showError(`Не вдалося завантажити тест. ${errorMessage}`);
             } finally {
                 loadingDiv.classList.add('hidden');
             }
