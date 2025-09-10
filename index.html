@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MyTestX - Панель викладача</title>
+    <title>MyTestX - Тестування</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -13,7 +13,7 @@
             transition: background-color 0.3s ease;
         }
         .container {
-            max-width: 900px;
+            max-width: 800px;
             padding: 2rem;
         }
         .card {
@@ -27,302 +27,356 @@
             transform: translateY(-5px);
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #e5e7eb;
-            text-align: left;
-        }
-        th {
-            background-color: #f9fafb;
+        .btn {
+            background-color: #4f46e5;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
             font-weight: 600;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .btn:hover {
+            background-color: #4338ca;
+            transform: translateY(-1px);
+        }
+        .btn:active {
+            transform: translateY(1px);
+        }
+        .btn-secondary {
+            background-color: #e5e7eb;
             color: #4b5563;
         }
-        tbody tr:nth-child(even) {
-            background-color: #f3f4f6;
+        .btn-secondary:hover {
+            background-color: #d1d5db;
         }
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border-left-color: #4f46e5;
-            animation: spin 1s ease infinite;
+        .input-field {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            transition: border-color 0.3s ease;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .input-field:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+        .option-item {
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+        .option-item:hover {
+            transform: translateX(5px);
+        }
+        .option-item.selected {
+            background-color: #eef2ff;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px #4f46e5;
+        }
+        .option-item.correct {
+            background-color: #d1fae5;
+            border-color: #10b981;
+        }
+        .option-item.incorrect {
+            background-color: #fee2e2;
+            border-color: #ef4444;
         }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
     <div class="container mx-auto p-4 md:p-8">
-
         <!-- Main Screen -->
-        <div id="main-screen" class="card space-y-6 text-center">
-            <h1 class="text-3xl font-bold text-gray-800">Панель викладача</h1>
-            <p class="text-lg text-gray-600">Завантажте файл тесту у форматі JSON, щоб переглянути результати студентів.</p>
-
-            <div class="flex flex-col items-center space-y-4">
-                <input type="file" id="quiz-file-input" accept=".json" class="block w-full text-sm text-gray-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-full file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-violet-50 file:text-violet-700
-                    hover:file:bg-violet-100 cursor-pointer">
-                <button id="load-file-btn" class="w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-full font-bold shadow-md hover:bg-blue-700 transition duration-300">
-                    Завантажити тест
-                </button>
+        <div id="main-screen" class="card space-y-6 max-w-lg mx-auto">
+            <h1 class="text-3xl font-bold text-center text-gray-800">MyTestX</h1>
+            <p class="text-center text-gray-600">Система тестування для учнів</p>
+            <div class="space-y-4">
+                <div>
+                    <label for="student-name" class="block text-sm font-medium text-gray-700">Ваше ім'я</label>
+                    <input type="text" id="student-name" class="input-field mt-1" placeholder="Введіть ваше ім'я">
+                </div>
+                <div>
+                    <label for="student-group" class="block text-sm font-medium text-gray-700">Назва класу/групи</label>
+                    <input type="text" id="student-group" class="input-field mt-1" placeholder="Введіть назву групи">
+                </div>
+                <div>
+                    <label for="file-upload" class="block text-sm font-medium text-gray-700">Завантажити файл тесту</label>
+                    <input type="file" id="file-upload" class="input-field mt-1 p-2" accept=".json">
+                </div>
+                <div id="student-loading" class="text-center hidden">
+                    <div class="spinner-border animate-spin inline-block w-8 h-8 border-4 rounded-full" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <div id="student-error" class="text-center text-red-500 hidden"></div>
             </div>
-            
-            <div id="loading-spinner" class="hidden flex justify-center items-center">
-                <div class="spinner"></div>
-            </div>
-
-            <p id="error-message" class="hidden text-red-500 font-medium"></p>
-        </div>
-
-        <!-- Quiz and Results Screen -->
-        <div id="results-screen" class="card hidden space-y-6">
-            <div class="flex flex-col md:flex-row justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800" id="quiz-title"></h2>
-                <button id="back-btn" class="px-4 py-2 mt-4 md:mt-0 bg-gray-200 text-gray-800 rounded-full font-semibold hover:bg-gray-300 transition duration-300">
-                    Назад
-                </button>
-            </div>
-
-            <!-- Quiz Info Section -->
-            <div class="p-4 bg-gray-50 rounded-lg shadow-inner">
-                <p class="text-gray-700"><span class="font-bold">ID тесту:</span> <span id="quiz-id"></span></p>
-                <p class="text-gray-700"><span class="font-bold">Всього запитань:</span> <span id="total-questions"></span></p>
-                <p class="text-sm text-red-500 mt-2">Цей ID тесту унікальний для вашої сесії. Поділіться ним зі студентами.</p>
-            </div>
-            
-            <!-- Results Section -->
-            <div class="overflow-x-auto">
-                <table id="results-table">
-                    <thead>
-                        <tr>
-                            <th>Ім'я студента</th>
-                            <th>Група</th>
-                            <th>Оцінка</th>
-                            <th>Відсоток</th>
-                            <th>Дата</th>
-                        </tr>
-                    </thead>
-                    <tbody id="results-table-body">
-                    </tbody>
-                </table>
-            </div>
-            
-            <div id="no-results-message" class="hidden text-center text-gray-500 mt-4">
-                Поки що немає результатів для цього тесту.
+            <div class="flex justify-center">
+                <button id="start-test-btn" class="btn w-full">Почати тестування</button>
             </div>
         </div>
 
-        <div id="modal-container" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4">
-            <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm text-center">
-                <h3 class="text-xl font-bold text-gray-800 mb-4" id="modal-title"></h3>
-                <p class="text-gray-600 mb-6" id="modal-message"></p>
-                <button id="modal-ok-btn" class="px-6 py-3 bg-blue-600 text-white rounded-full font-bold hover:bg-blue-700 transition duration-300">
-                    OK
-                </button>
+        <!-- Test Screen -->
+        <div id="test-screen" class="hidden">
+            <div class="card space-y-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="test-title" class="text-2xl font-bold text-gray-800"></h2>
+                    <span id="question-counter" class="text-lg font-semibold text-gray-600"></span>
+                </div>
+                <div id="question-card" class="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                    <p id="question-text" class="text-xl font-medium text-gray-900 mb-4"></p>
+                    <div id="options-container" class="space-y-3">
+                        <!-- Options will be dynamically inserted here -->
+                    </div>
+                </div>
+                <div class="flex justify-between mt-6">
+                    <button id="prev-question-btn" class="btn btn-secondary" style="display: none;">Попереднє</button>
+                    <button id="next-question-btn" class="btn ml-auto">Наступне</button>
+                    <button id="submit-test-btn" class="btn ml-auto hidden">Завершити тест</button>
+                </div>
             </div>
         </div>
 
+        <!-- Results Screen -->
+        <div id="results-screen" class="hidden">
+            <div class="card space-y-6 max-w-lg mx-auto">
+                <h2 class="text-3xl font-bold text-center text-gray-800">Результати тесту</h2>
+                <div class="space-y-3 text-lg text-gray-700">
+                    <p id="total-questions" class="font-medium"></p>
+                    <p id="correct-answers" class="font-medium"></p>
+                    <p id="score-percentage" class="font-bold text-xl text-indigo-600"></p>
+                </div>
+                <div class="flex justify-center">
+                    <button id="restart-test-btn" class="btn w-full">Почати знову</button>
+                </div>
+            </div>
+        </div>
     </div>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, orderBy, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-        
-        // Set log level to debug for development
-        setLogLevel('Debug');
+        import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, setDoc, query, where, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global variables for Firebase config
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // Firebase Initialization
+        setLogLevel('debug');
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        let app, db, auth;
+        let db = null;
+        let auth = null;
         let userId = null;
-        let quizTitle = null;
-        let quizQuestionsCount = 0;
-        let unsubscribeResults = null;
 
-        // UI Elements
+        if (Object.keys(firebaseConfig).length > 0) {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                if (initialAuthToken) {
+                    signInWithCustomToken(auth, initialAuthToken).then((userCredential) => {
+                        userId = userCredential.user.uid;
+                        console.log("Signed in with custom token. User ID:", userId);
+                    }).catch((error) => {
+                        console.error("Error signing in with custom token:", error);
+                    });
+                } else {
+                    signInAnonymously(auth).then((userCredential) => {
+                        userId = userCredential.user.uid;
+                        console.log("Signed in anonymously. User ID:", userId);
+                    }).catch((error) => {
+                        console.error("Error signing in anonymously:", error);
+                    });
+                }
+            } catch (e) {
+                console.error("Firebase initialization failed:", e);
+            }
+        } else {
+            console.log("Firebase config not found. Running in local mode.");
+        }
+
         const mainScreen = document.getElementById('main-screen');
+        const testScreen = document.getElementById('test-screen');
         const resultsScreen = document.getElementById('results-screen');
-        const fileInput = document.getElementById('quiz-file-input');
-        const loadFileBtn = document.getElementById('load-file-btn');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const errorMessageEl = document.getElementById('error-message');
-        const quizTitleEl = document.getElementById('quiz-title');
-        const quizIdEl = document.getElementById('quiz-id');
+        const fileUpload = document.getElementById('file-upload');
+        const startTestBtn = document.getElementById('start-test-btn');
+        const studentNameInput = document.getElementById('student-name');
+        const studentGroupInput = document.getElementById('student-group');
+        const testTitleEl = document.getElementById('test-title');
+        const questionCounterEl = document.getElementById('question-counter');
+        const questionTextEl = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const prevQuestionBtn = document.getElementById('prev-question-btn');
+        const nextQuestionBtn = document.getElementById('next-question-btn');
+        const submitTestBtn = document.getElementById('submit-test-btn');
         const totalQuestionsEl = document.getElementById('total-questions');
-        const resultsTableBody = document.getElementById('results-table-body');
-        const noResultsMessage = document.getElementById('no-results-message');
-        const backBtn = document.getElementById('back-btn');
-        const modalContainer = document.getElementById('modal-container');
-        const modalTitleEl = document.getElementById('modal-title');
-        const modalMessageEl = document.getElementById('modal-message');
-        const modalOkBtn = document.getElementById('modal-ok-btn');
+        const correctAnswersEl = document.getElementById('correct-answers');
+        const scorePercentageEl = document.getElementById('score-percentage');
+        const restartBtn = document.getElementById('restart-test-btn');
+        const studentLoading = document.getElementById('student-loading');
+        const studentError = document.getElementById('student-error');
 
-        // Function to show custom modal
-        function showModal(title, message) {
-            modalTitleEl.textContent = title;
-            modalMessageEl.textContent = message;
-            modalContainer.classList.remove('hidden');
-        }
+        let quizData = null;
+        let currentQuestionIndex = 0;
+        let userAnswers = {};
+        let isSubmitted = false;
 
-        // Function to hide custom modal
-        function hideModal() {
-            modalContainer.classList.add('hidden');
-        }
-
-        // Event listener for modal OK button
-        modalOkBtn.addEventListener('click', hideModal);
-
-        // Function to show a screen and hide others
         function showScreen(screen) {
             mainScreen.classList.add('hidden');
+            testScreen.classList.add('hidden');
             resultsScreen.classList.add('hidden');
             screen.classList.remove('hidden');
         }
 
-        // Initialize Firebase
-        if (firebaseConfig) {
-            try {
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                    } else {
-                        // Sign in anonymously if not authenticated
-                        await signInAnonymously(auth);
-                    }
-                });
-
-                if (initialAuthToken) {
-                    signInWithCustomToken(auth, initialAuthToken).catch((error) => {
-                        console.error("Custom token sign-in failed:", error);
-                        // Fallback to anonymous sign-in if custom token fails
-                        signInAnonymously(auth);
-                    });
-                }
-            } catch (error) {
-                console.error("Firebase initialization failed:", error);
-                showModal("Помилка", "Не вдалося ініціалізувати Firebase. Перевірте конфігурацію.");
-            }
-        } else {
-            console.error("Firebase config is not available.");
-            showModal("Помилка", "Конфігурація Firebase недоступна.");
-        }
-
-        // Handle file loading
-        loadFileBtn.addEventListener('click', () => {
-            if (fileInput.files.length === 0) {
-                showModal("Помилка", "Будь ласка, виберіть JSON-файл.");
+        fileUpload.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) {
                 return;
             }
-
-            const file = fileInput.files[0];
+            if (file.type !== 'application/json') {
+                showError("Будь ласка, завантажте файл у форматі .json.");
+                return;
+            }
             const reader = new FileReader();
-
-            loadingSpinner.classList.remove('hidden');
-            errorMessageEl.classList.add('hidden');
-
-            reader.onload = async (e) => {
+            reader.onload = (e) => {
                 try {
-                    const quizData = JSON.parse(e.target.result);
-                    if (!quizData.title || !quizData.questions || !Array.isArray(quizData.questions)) {
-                        throw new Error("Недійсний формат файлу. Очікується 'title' та 'questions'.");
+                    quizData = JSON.parse(e.target.result);
+                    if (!quizData || !quizData.questions || !Array.isArray(quizData.questions)) {
+                        throw new Error("Некоректна структура JSON.");
                     }
-                    
-                    quizTitle = quizData.title;
-                    quizQuestionsCount = quizData.questions.length;
-
-                    // Update UI with quiz info
-                    quizTitleEl.textContent = quizTitle;
-                    quizIdEl.textContent = userId; // Using userId as a simple quiz ID for this version
-                    totalQuestionsEl.textContent = quizQuestionsCount;
-
-                    // Start listening for results
-                    if (unsubscribeResults) {
-                        unsubscribeResults(); // Unsubscribe from previous listener if it exists
-                    }
-                    
-                    const quizResultsRef = collection(db, `artifacts/${appId}/public/data/quiz_results`);
-                    const q = query(quizResultsRef);
-                    
-                    unsubscribeResults = onSnapshot(q, (querySnapshot) => {
-                        resultsTableBody.innerHTML = '';
-                        let hasResults = false;
-                        querySnapshot.forEach((doc) => {
-                            const result = doc.data();
-                            // Filter results to show only for the current quiz (using userId as quizId)
-                            if (result.quizId === userId) {
-                                hasResults = true;
-                                const row = document.createElement('tr');
-                                const percentage = ((result.score / result.totalQuestions) * 100).toFixed(2);
-                                
-                                const date = result.timestamp ? new Date(result.timestamp.seconds * 1000).toLocaleDateString('uk-UA') : 'Невідомо';
-
-                                row.innerHTML = `
-                                    <td>${result.studentName}</td>
-                                    <td>${result.studentGroup}</td>
-                                    <td>${result.score}/${result.totalQuestions}</td>
-                                    <td>${percentage}%</td>
-                                    <td>${date}</td>
-                                `;
-                                resultsTableBody.appendChild(row);
-                            }
-                        });
-                        
-                        if (hasResults) {
-                            noResultsMessage.classList.add('hidden');
-                        } else {
-                            noResultsMessage.classList.remove('hidden');
-                        }
-                    }, (error) => {
-                        console.error("Error fetching results:", error);
-                        showModal("Помилка", "Не вдалося отримати результати. Перевірте з'єднання.");
-                    });
-
-                    loadingSpinner.classList.add('hidden');
-                    showScreen(resultsScreen);
-
+                    studentError.style.display = 'none';
                 } catch (error) {
-                    console.error("Error processing file:", error);
-                    loadingSpinner.classList.add('hidden');
-                    errorMessageEl.textContent = "Помилка обробки файлу. Переконайтеся, що це дійсний JSON-файл. " + error.message;
-                    errorMessageEl.classList.remove('hidden');
+                    showError("Помилка при обробці файлу. Переконайтеся, що це дійсний JSON-файл.");
+                    quizData = null;
                 }
             };
-
             reader.readAsText(file);
         });
 
-        // Handle back button
-        backBtn.addEventListener('click', () => {
-            showScreen(mainScreen);
-            // Clean up
-            if (unsubscribeResults) {
-                unsubscribeResults();
-                unsubscribeResults = null;
+        startTestBtn.addEventListener('click', () => {
+            const studentName = studentNameInput.value.trim();
+            const studentGroup = studentGroupInput.value.trim();
+            if (!studentName || !studentGroup || !quizData) {
+                showError("Будь ласка, заповніть усі поля та завантажте файл тесту.");
+                return;
             }
-            resultsTableBody.innerHTML = '';
-            fileInput.value = '';
+            testTitleEl.textContent = quizData.title || "Тест";
+            showScreen(testScreen);
+            renderQuestion();
         });
 
+        function renderQuestion() {
+            if (!quizData || !quizData.questions || quizData.questions.length === 0) {
+                showError("Файл тесту не містить запитань.");
+                return;
+            }
+            const currentQuestion = quizData.questions[currentQuestionIndex];
+            questionCounterEl.textContent = `Запитання ${currentQuestionIndex + 1} з ${quizData.questions.length}`;
+            questionTextEl.textContent = currentQuestion.question;
+            optionsContainer.innerHTML = '';
+            currentQuestion.options.forEach((option, index) => {
+                const optionEl = document.createElement('div');
+                optionEl.textContent = option;
+                optionEl.classList.add('option-item', 'p-4', 'border', 'rounded-lg', 'border-gray-300', 'hover:bg-gray-50');
+                if (userAnswers[currentQuestionIndex] === option) {
+                    optionEl.classList.add('selected');
+                }
+                optionEl.addEventListener('click', () => selectAnswer(option));
+                optionsContainer.appendChild(optionEl);
+            });
+            prevQuestionBtn.style.display = currentQuestionIndex === 0 ? 'none' : 'inline-block';
+            nextQuestionBtn.classList.toggle('hidden', currentQuestionIndex === quizData.questions.length - 1);
+            submitTestBtn.classList.toggle('hidden', currentQuestionIndex !== quizData.questions.length - 1);
+        }
+
+        function selectAnswer(answer) {
+            userAnswers[currentQuestionIndex] = answer;
+            renderQuestion();
+        }
+
+        nextQuestionBtn.addEventListener('click', () => {
+            if (currentQuestionIndex < quizData.questions.length - 1) {
+                currentQuestionIndex++;
+                renderQuestion();
+            }
+        });
+
+        prevQuestionBtn.addEventListener('click', () => {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                renderQuestion();
+            }
+        });
+
+        submitTestBtn.addEventListener('click', () => {
+            if (isSubmitted) return;
+            isSubmitted = true;
+            let score = 0;
+            quizData.questions.forEach((q, i) => {
+                if (userAnswers[i] === q.answer) {
+                    score++;
+                }
+            });
+            saveResult(score);
+        });
+
+        async function saveResult(score) {
+            const studentName = studentNameInput.value.trim();
+            const studentGroup = studentGroupInput.value.trim();
+
+            if (!db) {
+                console.error("Firestore is not initialized.");
+                showResults(score);
+                return;
+            }
+
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/public/results`), {
+                    name: studentName,
+                    group: studentGroup,
+                    score: score,
+                    total: quizData.questions.length,
+                    percentage: ((score / quizData.questions.length) * 100).toFixed(2),
+                    testTitle: quizData.title,
+                    timestamp: new Date()
+                });
+                console.log("Result saved to Firestore!");
+                showResults(score);
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                showResults(score);
+            }
+        }
+
+        function showResults(score) {
+            testScreen.classList.add('hidden');
+            resultsScreen.classList.remove('hidden');
+            const totalQuestions = quizData.questions.length;
+            const percentage = ((score / totalQuestions) * 100).toFixed(2);
+            totalQuestionsEl.textContent = `Загальна кількість запитань: ${totalQuestions}`;
+            correctAnswersEl.textContent = `Правильних відповідей: ${score}`;
+            scorePercentageEl.textContent = `Ваш результат: ${percentage}%`;
+        }
+
+        restartBtn.addEventListener('click', () => {
+            resultsScreen.classList.add('hidden');
+            showScreen(mainScreen);
+            studentNameInput.value = '';
+            studentGroupInput.value = '';
+            quizData = null;
+            currentQuestionIndex = 0;
+            userAnswers = {};
+            isSubmitted = false;
+        });
+        
+        function showError(message) {
+            studentLoading.style.display = 'none';
+            studentError.textContent = message;
+            studentError.style.display = 'block';
+            setTimeout(() => {
+                studentError.style.display = 'none';
+            }, 5000);
+        }
     </script>
 </body>
 </html>
