@@ -126,9 +126,9 @@
         <!-- Завантаження тесту -->
         <div class="card">
             <h2 class="text-xl font-bold mb-4">Завантажити новий тест</h2>
-            <p class="text-gray-600 mb-4">Виберіть файл `.txt` з новими запитаннями. Кожне завантаження замінить поточний тест.</p>
+            <p class="text-gray-600 mb-4">Виберіть файл `.json` з новими запитаннями. Кожне завантаження замінить поточний тест.</p>
             <div class="flex items-center space-x-4">
-                <input type="file" id="quiz-file-upload" accept=".txt" class="flex-grow">
+                <input type="file" id="quiz-file-upload" accept=".json" class="flex-grow">
                 <button id="upload-btn" class="btn btn-primary">Завантажити</button>
             </div>
             <p id="upload-status" class="message-box hidden"></p>
@@ -244,10 +244,11 @@
             reader.onload = async (e) => {
                 try {
                     const quizText = e.target.result;
-                    const quizData = parseQuizFile(quizText);
+                    // Оновлено: тепер парсимо файл як JSON
+                    const quizData = JSON.parse(quizText);
 
-                    if (!quizData || !quizData.questions || quizData.questions.length === 0) {
-                        showStatus("Недійсний формат файлу. Будь ласка, перевірте, що файл відповідає формату.", 'error');
+                    if (!quizData || !quizData.questions || !Array.isArray(quizData.questions) || quizData.questions.length === 0) {
+                        showStatus("Недійсний формат файлу. Будь ласка, перевірте, що файл відповідає формату JSON.", 'error');
                         return;
                     }
                     
@@ -261,55 +262,13 @@
                     showStatus('Тест успішно завантажено!', 'success');
                 } catch (error) {
                     console.error("Помилка при обробці файлу:", error);
-                    showStatus("Помилка при обробці файлу. Переконайтеся, що це дійсний TXT-файл.", 'error');
+                    // Покращене повідомлення про помилку для JSON
+                    showStatus("Помилка при обробці файлу. Переконайтеся, що це дійсний JSON-файл.", 'error');
                 }
             };
             reader.readAsText(file);
         });
         
-        // Функція для парсингу TXT-файлу
-        function parseQuizFile(text) {
-            const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line !== '');
-            const questions = [];
-            let currentQuestion = null;
-
-            lines.forEach(line => {
-                // Якщо рядок закінчується знаком питання, це нове запитання
-                if (line.endsWith('?')) {
-                    if (currentQuestion) {
-                        questions.push(currentQuestion);
-                    }
-                    currentQuestion = {
-                        question: line,
-                        options: [],
-                        answer: ''
-                    };
-                // Якщо рядок починається з зірочки, це правильна відповідь
-                } else if (line.startsWith('*')) {
-                    if (currentQuestion) {
-                        const answerText = line.substring(1).trim();
-                        currentQuestion.options.push(answerText);
-                        currentQuestion.answer = answerText;
-                    }
-                // Інакше, це варіант відповіді
-                } else {
-                    if (currentQuestion) {
-                        currentQuestion.options.push(line);
-                    }
-                }
-            });
-
-            // Додати останнє запитання, якщо воно є
-            if (currentQuestion) {
-                questions.push(currentQuestion);
-            }
-            
-            return {
-                title: "Новий тест", // Це значення можна зробити динамічним
-                questions: questions
-            };
-        }
-
         function showStatus(message, type) {
             uploadStatus.textContent = message;
             uploadStatus.classList.remove('hidden', 'message-success', 'message-error');
@@ -394,7 +353,17 @@
                             Оцінка: <b>${data.percentage}%</b>
                         `;
                         modalQuestionsList.innerHTML = '';
-                        const answers = data.answers;
+                        // Оновлено: парсимо JSON-рядок з відповідями
+                        let answers = {};
+                        try {
+                            answers = JSON.parse(data.answers);
+                        } catch (parseError) {
+                            console.error("Помилка парсингу відповідей:", parseError);
+                            modalQuestionsList.innerHTML = '<p class="text-gray-500">Помилка завантаження детальних відповідей. Недійсний формат даних.</p>';
+                            detailsModal.classList.remove('hidden');
+                            return;
+                        }
+
                         if (answers) {
                             for (const key in answers) {
                                 if (answers.hasOwnProperty(key)) {
