@@ -6,6 +6,396 @@
     <title>MyTestX</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+      import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+      import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, where, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+      import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+      
+      const firebaseConfig = JSON.parse(__firebase_config);
+      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      const auth = getAuth(app);
+      const analytics = getAnalytics(app);
+
+      let userId = null;
+      let quizData = null;
+      let currentQuestionIndex = 0;
+      let userAnswers = {};
+      let quizId = null;
+      let isAuthReady = false;
+
+      // Teacher UI elements
+      const loginScreen = document.getElementById('login-screen');
+      const passwordInput = document.getElementById('password');
+      const loginBtn = document.getElementById('login-btn');
+      const loginError = document.getElementById('login-error');
+      const teacherScreen = document.getElementById('teacher-screen');
+      const quizFile = document.getElementById('quizFile');
+      const fileNameDisplay = document.getElementById('fileName');
+      const uploadBtn = document.getElementById('uploadBtn');
+      const loadingDiv = document.getElementById('loading');
+      const uploadResultDiv = document.getElementById('uploadResult');
+      
+      // Student UI elements
+      const statusScreen = document.getElementById('status-screen');
+      const statusMessage = document.getElementById('status-message');
+      const mainScreen = document.getElementById('main-screen');
+      const testScreen = document.getElementById('test-screen');
+      const resultsScreen = document.getElementById('results-screen');
+      const quizTitleEl = document.getElementById('quiz-title');
+      const studentNameInput = document.getElementById('student-name');
+      const studentGroupInput = document.getElementById('student-group');
+      const studentError = document.getElementById('student-error');
+      const startBtn = document.getElementById('start-btn');
+      const questionTextEl = document.getElementById('question-text');
+      const optionsContainer = document.getElementById('options-container');
+      const currentQuestionEl = document.getElementById('current-question');
+      const totalQuestionsEl = document.getElementById('total-questions');
+      const prevBtn = document.getElementById('prev-btn');
+      const nextBtn = document.getElementById('next-btn');
+      const submitBtn = document.getElementById('submit-btn');
+      const totalQuestionsEl_res = document.getElementById('total-questions-el');
+      const correctAnswersEl = document.getElementById('correct-answers-el');
+      const scorePercentageEl = document.getElementById('score-percentage-el');
+      const restartBtn = document.getElementById('restart-btn');
+
+      // Modal elements
+      const modal = document.getElementById('confirm-modal');
+      const modalText = document.getElementById('modal-text');
+      const confirmBtn = document.getElementById('confirm-btn');
+      const cancelBtn = document.getElementById('cancel-btn');
+
+      // Teacher's password, you can change it
+      const TEACHER_PASSWORD = "D180893$"; 
+
+      // Function to show a specific screen and hide others
+      function showScreen(screen) {
+          document.querySelectorAll('.card').forEach(s => s.classList.add('hidden'));
+          screen.classList.remove('hidden');
+      }
+
+      // Function to show status messages
+      function showStatus(message, isError) {
+          statusMessage.textContent = message;
+          if (isError) {
+              statusMessage.classList.add('text-red-600');
+              document.getElementById('loading-spinner').classList.add('hidden');
+          }
+          statusScreen.classList.remove('hidden');
+      }
+
+      // Function to show a temporary error message
+      function showError(message, element) {
+          element.textContent = message;
+          element.classList.remove('hidden');
+          setTimeout(() => {
+              element.classList.add('hidden');
+          }, 5000);
+      }
+      
+      // Function to show the confirmation modal
+      function showConfirmationModal(message, onConfirm) {
+          modalText.textContent = message;
+          modal.classList.remove('hidden');
+          confirmBtn.onclick = () => {
+              modal.classList.add('hidden');
+              onConfirm();
+          };
+          cancelBtn.onclick = () => {
+              modal.classList.add('hidden');
+          };
+      }
+
+      // Authenticate with Firebase
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          userId = user.uid;
+          isAuthReady = true;
+          const urlParams = new URLSearchParams(window.location.search);
+          if (urlParams.has('quizId')) {
+              quizId = urlParams.get('quizId');
+              await loadQuizFromFirestore();
+          } else {
+              showScreen(loginScreen);
+          }
+        } else {
+          // Sign in anonymously if no auth token is provided
+          try {
+            if (typeof __initial_auth_token !== 'undefined') {
+              await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+              await signInAnonymously(auth);
+            }
+          } catch (error) {
+            console.error("Firebase Auth error:", error);
+            showStatus('Помилка автентифікації. Будь ласка, спробуйте оновити сторінку.', true);
+          }
+        }
+      });
+
+      // --- Teacher Logic ---
+      loginBtn.addEventListener('click', () => {
+          if (passwordInput.value === TEACHER_PASSWORD) {
+              showScreen(teacherScreen);
+              loginError.classList.add('hidden');
+          } else {
+              loginError.classList.remove('hidden');
+          }
+      });
+
+      quizFile.addEventListener('change', (e) => {
+          if (e.target.files.length > 0) {
+              fileNameDisplay.textContent = e.target.files[0].name;
+              uploadBtn.disabled = false;
+              uploadBtn.classList.remove('btn-disabled');
+          } else {
+              fileNameDisplay.textContent = 'Файл не вибрано';
+              uploadBtn.disabled = true;
+              uploadBtn.classList.add('btn-disabled');
+          }
+          uploadResultDiv.innerHTML = '';
+      });
+
+      uploadBtn.addEventListener('click', async () => {
+          const file = quizFile.files[0];
+          if (!file) {
+              showError("Будь ласка, спочатку виберіть файл для завантаження.", uploadResultDiv);
+              return;
+          }
+
+          loadingDiv.classList.remove('hidden');
+          uploadResultDiv.innerHTML = '';
+
+          try {
+              const fileContent = await readFileAsText(file);
+              const quizJson = JSON.parse(fileContent);
+              
+              // Save to Firestore
+              const quizesRef = collection(db, `artifacts/${appId}/public/data/quizes`);
+              const docRef = await addDoc(quizesRef, quizJson);
+              
+              const baseUrl = window.location.origin + window.location.pathname;
+              const testUrl = `${baseUrl}?quizId=${docRef.id}`;
+              
+              showSuccess("Посилання успішно створено!", testUrl);
+          } catch (error) {
+              console.error("Error processing quiz:", error);
+              let errorMessage = "Невідома помилка обробки файлу.";
+              if (error instanceof SyntaxError) {
+                  errorMessage = "Неправильний формат JSON у файлі. Перевірте, чи файл не пошкоджений.";
+              } else if (error.message) {
+                  errorMessage = error.message;
+              }
+              showError(`Не вдалося створити посилання. ${errorMessage}`, uploadResultDiv);
+          } finally {
+              loadingDiv.classList.add('hidden');
+          }
+      });
+      
+      function readFileAsText(file) {
+          return new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = (event) => resolve(event.target.result);
+              reader.onerror = (error) => reject(error);
+              reader.readAsText(file);
+          });
+      }
+      
+      function showSuccess(message, url) {
+          uploadResultDiv.innerHTML = `
+              <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-lg fade-in">
+                  <p class="font-bold">Успіх!</p>
+                  <p class="mt-2">${message}</p>
+                  <p class="mt-2">Поділіться цим посиланням зі студентами:</p>
+                  <div class="mt-2 flex items-center">
+                      <input type="text" id="testLink" value="${url}" readonly class="flex-grow bg-white text-gray-800 p-2 rounded-lg border border-gray-300 mr-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+                      <button onclick="copyLink()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Копіювати</button>
+                  </div>
+              </div>
+          `;
+      }
+      
+      window.copyLink = function() {
+          const linkInput = document.getElementById('testLink');
+          linkInput.select();
+          document.execCommand('copy');
+          const copyBtn = document.querySelector('button.bg-green-600');
+          copyBtn.textContent = 'Скопійовано!';
+          setTimeout(() => {
+              copyBtn.textContent = 'Копіювати';
+          }, 2000);
+      };
+
+      // --- Student Logic ---
+      async function loadQuizFromFirestore() {
+          showScreen(statusScreen);
+          showStatus('Завантаження тесту...', false);
+          try {
+              const quizesRef = doc(db, `artifacts/${appId}/public/data/quizes`, quizId);
+              const quizSnapshot = await getDoc(quizesRef);
+              
+              if (!quizSnapshot.exists()) {
+                  showStatus('Помилка: Тест з таким ID не знайдено. Перевірте посилання.', true);
+                  return;
+              }
+              
+              quizData = quizSnapshot.data();
+              showScreen(mainScreen);
+              quizTitleEl.textContent = quizData.title;
+          } catch (e) {
+              console.error("Помилка завантаження тесту: ", e);
+              showStatus('Не вдалося завантажити тест. Перевірте з’єднання з інтернетом або спробуйте ще раз.', true);
+          }
+      }
+      
+      startBtn.addEventListener('click', () => {
+          const studentName = studentNameInput.value.trim();
+          const studentGroup = studentGroupInput.value.trim();
+
+          if (!studentName || !studentGroup) {
+              showError("Будь ласка, заповніть усі поля.", studentError);
+              return;
+          }
+
+          showScreen(testScreen);
+          totalQuestionsEl.textContent = quizData.questions.length;
+          currentQuestionIndex = 0;
+          userAnswers = {};
+          
+          showQuestion();
+          updateNavigationButtons();
+      });
+
+      function showQuestion() {
+          const currentQuestion = quizData.questions[currentQuestionIndex];
+          questionTextEl.textContent = currentQuestion.question;
+          optionsContainer.innerHTML = '';
+          currentQuestion.options.forEach(option => {
+              const optionBtn = document.createElement('button');
+              optionBtn.textContent = option;
+              optionBtn.classList.add('w-full', 'py-3', 'px-4', 'text-left', 'border', 'rounded-md', 'shadow-sm', 'text-sm', 'font-medium', 'text-gray-700', 'bg-gray-50', 'hover:bg-gray-100', 'focus:outline-none', 'focus:ring-2', 'focus:ring-offset-2', 'focus:ring-indigo-500', 'transition-colors', 'duration-300');
+              
+              if (userAnswers[currentQuestionIndex] === option) {
+                  optionBtn.classList.add('bg-indigo-500', 'text-white', 'hover:bg-indigo-600');
+              }
+              
+              optionBtn.addEventListener('click', () => {
+                  userAnswers[currentQuestionIndex] = option;
+                  updateOptionsUI(currentQuestion.options, option);
+                  updateNavigationButtons();
+              });
+              optionsContainer.appendChild(optionBtn);
+          });
+          currentQuestionEl.textContent = currentQuestionIndex + 1;
+      }
+
+      function updateOptionsUI(options, selectedOption) {
+          optionsContainer.innerHTML = '';
+          options.forEach(option => {
+              const optionBtn = document.createElement('button');
+              optionBtn.textContent = option;
+              optionBtn.classList.add('w-full', 'py-3', 'px-4', 'text-left', 'border', 'rounded-md', 'shadow-sm', 'text-sm', 'font-medium', 'text-gray-700', 'bg-gray-50', 'hover:bg-gray-100', 'focus:outline-none', 'focus:ring-2', 'focus:ring-offset-2', 'focus:ring-indigo-500', 'transition-colors', 'duration-300');
+              
+              if (option === selectedOption) {
+                  optionBtn.classList.add('bg-indigo-500', 'text-white', 'hover:bg-indigo-600');
+                  optionBtn.classList.remove('bg-gray-50');
+              }
+              
+              optionBtn.addEventListener('click', () => {
+                  userAnswers[currentQuestionIndex] = option;
+                  updateOptionsUI(options, option);
+                  updateNavigationButtons();
+              });
+              optionsContainer.appendChild(optionBtn);
+          });
+      }
+
+      function updateNavigationButtons() {
+          prevBtn.classList.toggle('hidden', currentQuestionIndex === 0);
+          
+          if (currentQuestionIndex === quizData.questions.length - 1) {
+              nextBtn.classList.add('hidden');
+              submitBtn.classList.remove('hidden');
+          } else {
+              nextBtn.classList.remove('hidden');
+              submitBtn.classList.add('hidden');
+          }
+      }
+
+      prevBtn.addEventListener('click', () => {
+          if (currentQuestionIndex > 0) {
+              currentQuestionIndex--;
+              showQuestion();
+              updateNavigationButtons();
+          }
+      });
+
+      nextBtn.addEventListener('click', () => {
+          if (currentQuestionIndex < quizData.questions.length - 1) {
+              currentQuestionIndex++;
+              showQuestion();
+              updateNavigationButtons();
+          }
+      });
+
+      submitBtn.addEventListener('click', () => {
+          showConfirmationModal("Ви впевнені, що хочете завершити тест?", async () => {
+              const score = calculateScore();
+              await saveResultToFirestore(score);
+              showResults(score);
+          });
+      });
+
+      function calculateScore() {
+          let score = 0;
+          quizData.questions.forEach((q, index) => {
+              if (userAnswers[index] === q.answer) {
+                  score++;
+              }
+          });
+          return score;
+      }
+
+      async function saveResultToFirestore(score) {
+          try {
+              const resultsRef = collection(db, `artifacts/${appId}/public/data/results`);
+              const resultData = {
+                  quizId: quizId,
+                  studentName: studentNameInput.value.trim(),
+                  studentGroup: studentGroupInput.value.trim(),
+                  totalQuestions: quizData.questions.length,
+                  correctAnswers: score,
+                  timestamp: Timestamp.now()
+              };
+              await addDoc(resultsRef, resultData);
+              console.log("Result saved to Firestore!");
+          } catch (e) {
+              console.error("Error saving document to Firestore:", e);
+          }
+      }
+
+      function showResults(score) {
+          testScreen.classList.add('hidden');
+          resultsScreen.classList.remove('hidden');
+          const totalQuestions = quizData.questions.length;
+          const percentage = ((score / totalQuestions) * 100).toFixed(2);
+          totalQuestionsEl_res.textContent = `Загальна кількість запитань: ${totalQuestions}`;
+          correctAnswersEl.textContent = `Правильних відповідей: ${score}`;
+          scorePercentageEl.textContent = `Ваш результат: ${percentage}%`;
+      }
+
+      restartBtn.addEventListener('click', () => {
+          resultsScreen.classList.add('hidden');
+          showScreen(mainScreen);
+          studentNameInput.value = '';
+          studentGroupInput.value = '';
+          currentQuestionIndex = 0;
+          userAnswers = {};
+      });
+    </script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -62,6 +452,25 @@
         .spinner {
             border-top-color: #4f46e5;
             animation: spin 1s linear infinite;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            max-width: 400px;
+            text-align: center;
         }
     </style>
 </head>
@@ -163,342 +572,17 @@
                 Повторити тест
             </button>
         </div>
-    </div>
 
-    <script>
-        // Set the teacher's password here
-        const TEACHER_PASSWORD = "D180893$"; 
-
-        let quizData = null;
-        let currentQuestionIndex = 0;
-        let userAnswers = {};
-
-        // Teacher UI elements
-        const loginScreen = document.getElementById('login-screen');
-        const passwordInput = document.getElementById('password');
-        const loginBtn = document.getElementById('login-btn');
-        const loginError = document.getElementById('login-error');
-        const teacherScreen = document.getElementById('teacher-screen');
-        const quizFile = document.getElementById('quizFile');
-        const fileNameDisplay = document.getElementById('fileName');
-        const uploadBtn = document.getElementById('uploadBtn');
-        const loadingDiv = document.getElementById('loading');
-        const uploadResultDiv = document.getElementById('uploadResult');
-
-        // Student UI elements
-        const statusScreen = document.getElementById('status-screen');
-        const statusMessage = document.getElementById('status-message');
-        const mainScreen = document.getElementById('main-screen');
-        const testScreen = document.getElementById('test-screen');
-        const resultsScreen = document.getElementById('results-screen');
-        const quizTitleEl = document.getElementById('quiz-title');
-        const studentNameInput = document.getElementById('student-name');
-        const studentGroupInput = document.getElementById('student-group');
-        const studentError = document.getElementById('student-error');
-        const startBtn = document.getElementById('start-btn');
-        const questionTextEl = document.getElementById('question-text');
-        const optionsContainer = document.getElementById('options-container');
-        const currentQuestionEl = document.getElementById('current-question');
-        const totalQuestionsEl = document.getElementById('total-questions');
-        const prevBtn = document.getElementById('prev-btn');
-        const nextBtn = document.getElementById('next-btn');
-        const submitBtn = document.getElementById('submit-btn');
-        const totalQuestionsEl_res = document.getElementById('total-questions-el');
-        const correctAnswersEl = document.getElementById('correct-answers-el');
-        const scorePercentageEl = document.getElementById('score-percentage-el');
-        const restartBtn = document.getElementById('restart-btn');
-
-        // Initial check on page load
-        function initApp() {
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.has('quiz')) {
-                loadQuizFromUrl();
-            } else {
-                showScreen(loginScreen);
-            }
-        }
-
-        // --- Helper functions for encoding/decoding Unicode strings ---
-        function utf8ToBase64(str) {
-            return btoa(unescape(encodeURIComponent(str)));
-        }
-
-        function base64ToUtf8(str) {
-            try {
-                return decodeURIComponent(escape(atob(str)));
-            } catch (e) {
-                console.error("Failed to decode Base64 string:", e);
-                return null;
-            }
-        }
-        
-        // --- Teacher Logic ---
-        loginBtn.addEventListener('click', () => {
-            if (passwordInput.value === TEACHER_PASSWORD) {
-                showScreen(teacherScreen);
-                loginError.classList.add('hidden');
-            } else {
-                loginError.classList.remove('hidden');
-            }
-        });
-
-        quizFile.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                fileNameDisplay.textContent = e.target.files[0].name;
-                uploadBtn.disabled = false;
-                uploadBtn.classList.remove('btn-disabled');
-            } else {
-                fileNameDisplay.textContent = 'Файл не вибрано';
-                uploadBtn.disabled = true;
-                uploadBtn.classList.add('btn-disabled');
-            }
-            uploadResultDiv.innerHTML = '';
-        });
-
-        uploadBtn.addEventListener('click', async () => {
-            const file = quizFile.files[0];
-            if (!file) {
-                showError("Будь ласка, спочатку виберіть файл для завантаження.", uploadResultDiv);
-                return;
-            }
-
-            loadingDiv.classList.remove('hidden');
-            uploadResultDiv.innerHTML = '';
-
-            try {
-                const fileContent = await readFileAsText(file);
-                const encodedData = utf8ToBase64(fileContent); // Use the new encoding function
-                if (!encodedData) {
-                    throw new Error("Не вдалося закодувати дані тесту.");
-                }
-                
-                const baseUrl = window.location.origin + window.location.pathname;
-                const testUrl = `${baseUrl}?quiz=${encodedData}`;
-                
-                showSuccess("Посилання успішно створено!", testUrl);
-            } catch (error) {
-                console.error("Error processing quiz:", error);
-                let errorMessage = "Невідома помилка обробки файлу.";
-                if (error instanceof SyntaxError) {
-                    errorMessage = "Неправильний формат JSON у файлі. Перевірте, чи файл не пошкоджений.";
-                } else if (error.message) {
-                    errorMessage = error.message;
-                }
-                showError(`Не вдалося створити посилання. ${errorMessage}`, uploadResultDiv);
-            } finally {
-                loadingDiv.classList.add('hidden');
-            }
-        });
-        
-        function readFileAsText(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (event) => resolve(event.target.result);
-                reader.onerror = (error) => reject(error);
-                reader.readAsText(file);
-            });
-        }
-        
-        function showSuccess(message, url) {
-            uploadResultDiv.innerHTML = `
-                <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-lg fade-in">
-                    <p class="font-bold">Успіх!</p>
-                    <p class="mt-2">${message}</p>
-                    <p class="mt-2">Поділіться цим посиланням зі студентами:</p>
-                    <div class="mt-2 flex items-center">
-                        <input type="text" id="testLink" value="${url}" readonly class="flex-grow bg-white text-gray-800 p-2 rounded-lg border border-gray-300 mr-2 focus:outline-none focus:ring-2 focus:ring-green-500">
-                        <button onclick="copyLink()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Копіювати</button>
-                    </div>
+        <!-- Custom Confirmation Modal -->
+        <div id="confirm-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <p id="modal-text" class="text-gray-800 text-lg mb-6"></p>
+                <div class="flex justify-center space-x-4">
+                    <button id="cancel-btn" class="py-2 px-4 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400">Скасувати</button>
+                    <button id="confirm-btn" class="py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Підтвердити</button>
                 </div>
-            `;
-        }
-        
-        window.copyLink = function() {
-            const linkInput = document.getElementById('testLink');
-            linkInput.select();
-            document.execCommand('copy');
-            const copyBtn = document.querySelector('button.bg-green-600');
-            copyBtn.textContent = 'Скопійовано!';
-            setTimeout(() => {
-                copyBtn.textContent = 'Копіювати';
-            }, 2000);
-        };
-        
-        // --- Student Logic ---
-        function loadQuizFromUrl() {
-            showScreen(statusScreen);
-            const urlParams = new URLSearchParams(window.location.search);
-            try {
-                const encodedQuiz = urlParams.get('quiz');
-                if (!encodedQuiz) {
-                    showStatus('Помилка: Не знайдено дані тесту в URL. Це сторінка для викладача.', true);
-                    return;
-                }
-                const decodedData = base64ToUtf8(encodedQuiz); // Use the new decoding function
-                if (!decodedData) {
-                    showStatus('Не вдалося декодувати тест. Перевірте посилання.', true);
-                    return;
-                }
-                quizData = JSON.parse(decodedData);
-                
-                showStatus('', false); 
-                showScreen(mainScreen);
-                quizTitleEl.textContent = quizData.title;
-            } catch (e) {
-                console.error("Помилка завантаження тесту: ", e);
-                showStatus('Не вдалося завантажити тест. Перевірте посилання або спробуйте ще раз.', true);
-            }
-        }
-        
-        startBtn.addEventListener('click', () => {
-            const studentName = studentNameInput.value.trim();
-            const studentGroup = studentGroupInput.value.trim();
-
-            if (!studentName || !studentGroup) {
-                showError("Будь ласка, заповніть усі поля.", studentError);
-                return;
-            }
-
-            showScreen(testScreen);
-            totalQuestionsEl.textContent = quizData.questions.length;
-            currentQuestionIndex = 0;
-            userAnswers = {};
-            
-            showQuestion();
-            updateNavigationButtons();
-        });
-
-        function showQuestion() {
-            const currentQuestion = quizData.questions[currentQuestionIndex];
-            questionTextEl.textContent = currentQuestion.question;
-            optionsContainer.innerHTML = '';
-            currentQuestion.options.forEach(option => {
-                const optionBtn = document.createElement('button');
-                optionBtn.textContent = option;
-                optionBtn.classList.add('w-full', 'py-3', 'px-4', 'text-left', 'border', 'rounded-md', 'shadow-sm', 'text-sm', 'font-medium', 'text-gray-700', 'bg-gray-50', 'hover:bg-gray-100', 'focus:outline-none', 'focus:ring-2', 'focus:ring-offset-2', 'focus:ring-indigo-500', 'transition-colors', 'duration-300');
-                
-                if (userAnswers[currentQuestionIndex] === option) {
-                    optionBtn.classList.add('bg-indigo-500', 'text-white', 'hover:bg-indigo-600');
-                }
-                
-                optionBtn.addEventListener('click', () => {
-                    userAnswers[currentQuestionIndex] = option;
-                    updateOptionsUI(currentQuestion.options, option);
-                    updateNavigationButtons();
-                });
-                optionsContainer.appendChild(optionBtn);
-            });
-            currentQuestionEl.textContent = currentQuestionIndex + 1;
-        }
-
-        function updateOptionsUI(options, selectedOption) {
-            optionsContainer.innerHTML = '';
-            options.forEach(option => {
-                const optionBtn = document.createElement('button');
-                optionBtn.textContent = option;
-                optionBtn.classList.add('w-full', 'py-3', 'px-4', 'text-left', 'border', 'rounded-md', 'shadow-sm', 'text-sm', 'font-medium', 'text-gray-700', 'bg-gray-50', 'hover:bg-gray-100', 'focus:outline-none', 'focus:ring-2', 'focus:ring-offset-2', 'focus:ring-indigo-500', 'transition-colors', 'duration-300');
-                
-                if (option === selectedOption) {
-                    optionBtn.classList.add('bg-indigo-500', 'text-white', 'hover:bg-indigo-600');
-                    optionBtn.classList.remove('bg-gray-50');
-                }
-                
-                optionBtn.addEventListener('click', () => {
-                    userAnswers[currentQuestionIndex] = option;
-                    updateOptionsUI(options, option);
-                    updateNavigationButtons();
-                });
-                optionsContainer.appendChild(optionBtn);
-            });
-        }
-
-        function updateNavigationButtons() {
-            prevBtn.classList.toggle('hidden', currentQuestionIndex === 0);
-            
-            if (currentQuestionIndex === quizData.questions.length - 1) {
-                nextBtn.classList.add('hidden');
-                submitBtn.classList.remove('hidden');
-            } else {
-                nextBtn.classList.remove('hidden');
-                submitBtn.classList.add('hidden');
-            }
-        }
-
-        prevBtn.addEventListener('click', () => {
-            if (currentQuestionIndex > 0) {
-                currentQuestionIndex--;
-                showQuestion();
-                updateNavigationButtons();
-            }
-        });
-
-        nextBtn.addEventListener('click', () => {
-            if (currentQuestionIndex < quizData.questions.length - 1) {
-                currentQuestionIndex++;
-                showQuestion();
-                updateNavigationButtons();
-            }
-        });
-
-        submitBtn.addEventListener('click', () => {
-            showResults(calculateScore());
-        });
-
-        function calculateScore() {
-            let score = 0;
-            quizData.questions.forEach((q, index) => {
-                if (userAnswers[index] === q.answer) {
-                    score++;
-                }
-            });
-            return score;
-        }
-
-        function showResults(score) {
-            testScreen.classList.add('hidden');
-            resultsScreen.classList.remove('hidden');
-            const totalQuestions = quizData.questions.length;
-            const percentage = ((score / totalQuestions) * 100).toFixed(2);
-            totalQuestionsEl_res.textContent = `Загальна кількість запитань: ${totalQuestions}`;
-            correctAnswersEl.textContent = `Правильних відповідей: ${score}`;
-            scorePercentageEl.textContent = `Ваш результат: ${percentage}%`;
-        }
-
-        restartBtn.addEventListener('click', () => {
-            resultsScreen.classList.add('hidden');
-            showScreen(mainScreen);
-            studentNameInput.value = '';
-            studentGroupInput.value = '';
-            currentQuestionIndex = 0;
-            userAnswers = {};
-        });
-        
-        function showScreen(screen) {
-            document.querySelectorAll('.card').forEach(s => s.classList.add('hidden'));
-            screen.classList.remove('hidden');
-        }
-
-        function showStatus(message, isError) {
-            statusMessage.textContent = message;
-            if (isError) {
-                statusMessage.classList.add('text-red-600');
-                document.getElementById('loading-spinner').classList.add('hidden');
-            }
-            statusScreen.classList.remove('hidden');
-            if (isError) {
-                setTimeout(() => statusScreen.classList.add('hidden'), 5000);
-            }
-        }
-
-        function showError(message, element) {
-            element.textContent = message;
-            element.classList.remove('hidden');
-            setTimeout(() => {
-                element.classList.add('hidden');
-            }, 5000);
-        }
-
-        initApp();
-    </script>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
