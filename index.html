@@ -109,6 +109,9 @@
             width: 90%;
             text-align: center;
         }
+        .modal-message {
+            text-align: left;
+        }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
@@ -123,9 +126,9 @@
         <!-- Завантаження тесту -->
         <div class="card">
             <h2 class="text-xl font-bold mb-4">Завантажити новий тест</h2>
-            <p class="text-gray-600 mb-4">Виберіть файл `.json` з новими запитаннями. Кожне завантаження замінить поточний тест.</p>
+            <p class="text-gray-600 mb-4">Виберіть файл `.txt` з новими запитаннями. Кожне завантаження замінить поточний тест.</p>
             <div class="flex items-center space-x-4">
-                <input type="file" id="quiz-file-upload" accept=".json" class="flex-grow">
+                <input type="file" id="quiz-file-upload" accept=".txt" class="flex-grow">
                 <button id="upload-btn" class="btn btn-primary">Завантажити</button>
             </div>
             <p id="upload-status" class="message-box hidden"></p>
@@ -171,13 +174,24 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Модальне вікно для помилок -->
+        <div id="error-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3 class="text-2xl font-bold mb-4 text-red-700">Помилка</h3>
+                <p id="error-message" class="text-lg text-gray-700 mb-4 modal-message"></p>
+                <div class="mt-6 flex justify-end">
+                    <button id="close-error-modal-btn" class="btn btn-secondary">Закрити</button>
+                </div>
+            </div>
+        </div>
 
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Глобальні змінні, що надаються середовищем Canvas
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -229,9 +243,11 @@
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
-                    const quizData = JSON.parse(e.target.result);
-                    if (!quizData.questions || !Array.isArray(quizData.questions)) {
-                        showStatus("Недійсний формат файлу. Потрібен масив питань.", 'error');
+                    const quizText = e.target.result;
+                    const quizData = parseQuizFile(quizText);
+
+                    if (!quizData || !quizData.questions || quizData.questions.length === 0) {
+                        showStatus("Недійсний формат файлу. Будь ласка, перевірте, що файл відповідає формату.", 'error');
                         return;
                     }
                     
@@ -245,12 +261,51 @@
                     showStatus('Тест успішно завантажено!', 'success');
                 } catch (error) {
                     console.error("Помилка при обробці файлу:", error);
-                    showStatus("Помилка при обробці файлу. Переконайтеся, що це дійсний JSON.", 'error');
+                    showStatus("Помилка при обробці файлу. Переконайтеся, що це дійсний TXT-файл.", 'error');
                 }
             };
             reader.readAsText(file);
         });
         
+        // Функція для парсингу TXT-файлу
+        function parseQuizFile(text) {
+            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+            const questions = [];
+            let currentQuestion = null;
+
+            lines.forEach(line => {
+                if (line.endsWith('?')) {
+                    if (currentQuestion) {
+                        questions.push(currentQuestion);
+                    }
+                    currentQuestion = {
+                        question: line,
+                        options: [],
+                        answer: ''
+                    };
+                } else if (line.startsWith('*')) {
+                    if (currentQuestion) {
+                        const answerText = line.substring(1).trim();
+                        currentQuestion.options.push(answerText);
+                        currentQuestion.answer = answerText;
+                    }
+                } else {
+                    if (currentQuestion) {
+                        currentQuestion.options.push(line.trim());
+                    }
+                }
+            });
+
+            if (currentQuestion) {
+                questions.push(currentQuestion);
+            }
+            
+            return {
+                title: "Новий тест", // Можна додати поле для назви тесту в майбутньому
+                questions: questions
+            };
+        }
+
         function showStatus(message, type) {
             uploadStatus.textContent = message;
             uploadStatus.classList.remove('hidden', 'message-success', 'message-error');
@@ -305,54 +360,73 @@
             });
         }
         
-        // Обробка модального вікна для детальних результатів
+        // Обробка модальних вікон
         const detailsModal = document.getElementById('details-modal');
         const closeModalBtn = document.getElementById('close-modal-btn');
         const modalStudentInfo = document.getElementById('modal-student-info');
         const modalQuestionsList = document.getElementById('modal-questions-list');
-        
-        document.addEventListener('click', (e) => {
+        const errorModal = document.getElementById('error-modal');
+        const closeErrorModalBtn = document.getElementById('close-error-modal-btn');
+        const errorMessageEl = document.getElementById('error-message');
+
+        function showModalError(message) {
+            errorMessageEl.textContent = message;
+            errorModal.classList.remove('hidden');
+        }
+
+        document.addEventListener('click', async (e) => {
             if (e.target.classList.contains('view-details')) {
                 const docId = e.target.getAttribute('data-doc-id');
                 const resultsRef = collection(db, `/artifacts/${appId}/public/data/quiz_results`);
                 const docRef = doc(resultsRef, docId);
                 
-                onSnapshot(docRef, (docSnap) => {
+                try {
+                    const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         modalStudentInfo.innerHTML = `
                             Студент: <b>${data.studentName}</b>, 
-                            Група: <b>${data.studentGroup}</b>
+                            Група: <b>${data.studentGroup}</b>,
                             Оцінка: <b>${data.percentage}%</b>
                         `;
                         modalQuestionsList.innerHTML = '';
                         const answers = data.answers;
-                        for (const key in answers) {
-                            if (answers.hasOwnProperty(key)) {
-                                const questionData = answers[key];
-                                const questionEl = document.createElement('div');
-                                const isCorrect = questionData.isCorrect;
-                                const colorClass = isCorrect ? 'text-green-600' : 'text-red-600';
-                                
-                                questionEl.innerHTML = `
-                                    <p class="font-semibold">${questionData.question}</p>
-                                    <p class="text-sm">Ваша відповідь: <span class="${colorClass}">${questionData.userAnswer}</span></p>
-                                    <p class="text-sm">Правильна відповідь: <span class="text-green-600">${questionData.correctAnswer}</span></p>
-                                `;
-                                modalQuestionsList.appendChild(questionEl);
+                        if (answers) {
+                            for (const key in answers) {
+                                if (answers.hasOwnProperty(key)) {
+                                    const questionData = answers[key];
+                                    const questionEl = document.createElement('div');
+                                    const isCorrect = questionData.isCorrect;
+                                    const colorClass = isCorrect ? 'text-green-600' : 'text-red-600';
+                                    
+                                    questionEl.innerHTML = `
+                                        <p class="font-semibold">${questionData.question}</p>
+                                        <p class="text-sm">Ваша відповідь: <span class="${colorClass}">${questionData.userAnswer}</span></p>
+                                        <p class="text-sm">Правильна відповідь: <span class="text-green-600">${questionData.correctAnswer}</span></p>
+                                    `;
+                                    modalQuestionsList.appendChild(questionEl);
+                                }
                             }
+                        } else {
+                            modalQuestionsList.innerHTML = '<p class="text-gray-500">Деталі відповідей недоступні.</p>';
                         }
                         detailsModal.classList.remove('hidden');
+                    } else {
+                        showModalError("Документ не знайдено.");
                     }
-                }, (error) => {
+                } catch (error) {
                     console.error("Помилка отримання деталей документа: ", error);
-                    alert("Помилка отримання даних. Будь ласка, спробуйте ще раз.");
-                });
+                    showModalError("Помилка отримання даних. Будь ласка, спробуйте ще раз.");
+                }
             }
         });
 
         closeModalBtn.addEventListener('click', () => {
             detailsModal.classList.add('hidden');
+        });
+        
+        closeErrorModalBtn.addEventListener('click', () => {
+            errorModal.classList.add('hidden');
         });
 
         authenticateUser();
